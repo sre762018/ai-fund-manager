@@ -186,8 +186,7 @@ canvas.fund-chart{width:100%;display:block;border-radius:8px}
 .ocr-section{margin-bottom:16px}
 .ocr-section details summary{cursor:pointer;font-size:.85rem;color:#666;padding:6px 0}
 .ocr-section details summary:hover{color:#1890ff}
-.ocr-body{margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.ocr-body input[type=file]{font-size:.82rem;flex:1}
+.ocr-body{margin-top:8px;display:flex;gap:8px;align-items:stretch;flex-wrap:wrap;flex-direction:column}
 .ocr-result{font-size:.8rem;color:#666;margin-top:6px}
 
 /* ===== EMPTY STATE ===== */
@@ -254,15 +253,17 @@ canvas.fund-chart{width:100%;display:block;border-radius:8px}
     </details>
   </div>
 
-  <!-- OCR UPLOAD -->
+  <!-- TEXT IMPORT -->
   <div class="ocr-section">
     <details>
-      <summary>📷 图片OCR识别基金代码</summary>
-      <div class="ocr-body">
-        <input type="file" id="ocrFile" accept="image/*" onchange="handleOcr(event)">
-        <button class="btn-secondary" onclick="document.getElementById('ocrFile').click()" style="font-size:.82rem;padding:6px 12px;min-height:36px">选择图片</button>
+      <summary>📋 粘贴文本批量导入基金</summary>
+      <div class="ocr-body" style="flex-direction:column;align-items:stretch">
+        <textarea id="ocrText" placeholder="粘贴持仓截图的文字内容，或直接输入包含基金代码的文本，系统会自动提取6位基金代码..." style="width:100%;height:80px;padding:10px;border:1.5px solid #d0d7de;border-radius:8px;font-size:.85rem;outline:none;resize:vertical;font-family:inherit"></textarea>
+        <div style="display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap">
+          <button class="btn-primary" onclick="parseTextImport()" style="padding:8px 16px;font-size:.85rem">🔍 提取并导入</button>
+          <span class="ocr-result" id="ocrResult"></span>
+        </div>
       </div>
-      <div class="ocr-result" id="ocrResult"></div>
     </details>
   </div>
 
@@ -1321,79 +1322,49 @@ function updateSummary(computed) {
 }
 
 // ============================================================
-// OCR
+// TEXT IMPORT (粘贴文本提取基金代码)
 // ============================================================
-async function handleOcr(e) {
-  const file = e.target.files[0];
-  if (!file) return;
-  const apiKey = localStorage.getItem(LS_KEY) || '';
-  if (!apiKey) { showToast('请先设置DeepSeek API Key'); return; }
+function parseTextImport() {
+  const text = document.getElementById('ocrText').value;
+  if (!text.trim()) { showToast('请粘贴包含基金代码的文本'); return; }
+  
+  // 提取所有6位数字作为基金代码
+  const codeMatches = text.match(/\b\d{6}\b/g) || [];
+  const seen = {};
+  const uniqueCodes = [];
+  codeMatches.forEach(c => {
+    if (!seen[c]) { seen[c] = true; uniqueCodes.push(c); }
+  });
+
+  // 尝试提取代码后面跟着的金额
+  const amountMap = {};
+  uniqueCodes.forEach(code => {
+    const regex = new RegExp(code + '[^\\d]*(\\d[\\d,]*\\.?\\d*)\\s*(元|¥)?');
+    const m = regex.exec(text);
+    if (m && m[1]) amountMap[code] = parseFloat(m[1].replace(/,/g, ''));
+  });
+
+  let added = 0;
+  uniqueCodes.forEach(code => {
+    if (!funds[code]) {
+      funds[code] = {code, name: code, amount: amountMap[code] || 0, cost: 0};
+      added++;
+    } else if (amountMap[code]) {
+      funds[code].amount = amountMap[code];
+    }
+  });
+
+  saveFundsToLS();
+  renderCards();
+  updateSummary();
 
   const resultEl = document.getElementById('ocrResult');
-  resultEl.textContent = '识别中...';
-
-  try {
-    const base64 = await fileToBase64(file);
-    const mimeType = file.type || 'image/jpeg';
-
-    const resp = await fetch('https://api.deepseek.com/chat/completions', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json','Authorization':'Bearer '+apiKey},
-      body: JSON.stringify({
-        model: DEEPSEEK_MODEL,
-        messages: [{
-          role: 'user',
-          content: [
-            {type:'image_url', image_url:{url:`data:${mimeType};base64,${base64}`}},
-            {type:'text', text:'请识别图片中的基金代码（6位数字）和持仓金额。以JSON格式返回：{"funds":[{"code":"XXXXXX","amount":数字}]}。如果无法识别，返回{"funds":[]}'}
-          ]
-        }]
-      })
-    });
-
-    if (!resp.ok) throw new Error('API响应: ' + resp.status);
-    const json = await resp.json();
-    const content = json.choices[0].message.content;
-
-    // Extract JSON
-    const match = content.match(/\{[\s\S]*\}/);
-    if (!match) throw new Error('无法解析返回');
-    const data = JSON.parse(match[0]);
-
-    if (!data.funds || !data.funds.length) {
-      resultEl.textContent = '未识别到基金代码';
-      return;
-    }
-
-    let added = 0;
-    data.funds.forEach(item => {
-      const code = String(item.code).padStart(6,'0');
-      if (!/^\d{6}$/.test(code)) return;
-      if (!funds[code]) {
-        funds[code] = {code, name:code, amount: item.amount||0, cost:0};
-        added++;
-      } else if (item.amount) {
-        funds[code].amount = item.amount;
-      }
-    });
-    saveFundsToLS();
-    renderCards();
-    updateSummary();
-    resultEl.textContent = `识别完成，新增 ${added} 只基金，共识别 ${data.funds.length} 条记录`;
-    showToast(`OCR识别完成`);
-  } catch(err) {
-    resultEl.textContent = '识别失败: ' + err.message + '，请手动输入基金代码';
+  if (uniqueCodes.length === 0) {
+    resultEl.textContent = '未找到6位基金代码，请检查文本内容';
+  } else {
+    resultEl.textContent = '✅ 找到 ' + uniqueCodes.length + ' 个代码，新增 ' + added + ' 只：' + uniqueCodes.join(', ');
+    showToast('导入完成，新增 ' + added + ' 只');
   }
-  e.target.value = '';
-}
-
-function fileToBase64(file) {
-  return new Promise((res, rej) => {
-    const reader = new FileReader();
-    reader.onload = e => res(e.target.result.split(',')[1]);
-    reader.onerror = rej;
-    reader.readAsDataURL(file);
-  });
 }
 
 // ============================================================
