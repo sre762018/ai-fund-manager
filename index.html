@@ -1,0 +1,1423 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 基金分析师</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f0f2f5;color:#222;min-height:100vh}
+
+/* ===== HEADER ===== */
+.header{background:linear-gradient(135deg,#1a1a2e,#16213e,#0f3460);color:#fff;padding:0;position:sticky;top:0;z-index:100;box-shadow:0 2px 12px rgba(0,0,0,.4)}
+.header-top{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;gap:12px;flex-wrap:wrap}
+.header-title{font-size:1.3rem;font-weight:700;white-space:nowrap}
+.header-title span{color:#64b5f6}
+.status-bar{display:flex;align-items:center;gap:10px;font-size:.8rem;color:#aac;flex-wrap:wrap}
+.status-clock{font-family:monospace;font-size:.9rem;color:#7ef}
+.trade-badge{padding:2px 8px;border-radius:10px;font-size:.72rem;font-weight:600}
+.trade-open{background:#1b5e20;color:#a5d6a7}
+.trade-closed{background:#37474f;color:#b0bec5}
+
+/* ===== TIMER BAR ===== */
+.timer-bar{display:flex;align-items:center;gap:10px;padding:8px 20px;background:rgba(255,255,255,.06);border-top:1px solid rgba(255,255,255,.1);flex-wrap:wrap}
+.timer-bar label{font-size:.78rem;color:#aac}
+.timer-bar select{background:rgba(255,255,255,.1);color:#fff;border:1px solid rgba(255,255,255,.2);padding:2px 8px;border-radius:6px;font-size:.78rem}
+.timer-bar select option{background:#1a1a2e}
+.btn-timer{padding:4px 14px;border-radius:6px;border:none;cursor:pointer;font-size:.78rem;font-weight:600;transition:.2s}
+.btn-timer.on{background:#388e3c;color:#fff}
+.btn-timer.off{background:#b71c1c;color:#fff}
+.next-time{font-size:.78rem;color:#7ef;font-family:monospace}
+
+/* ===== MAIN CONTENT ===== */
+.container{max-width:960px;margin:0 auto;padding:16px}
+
+/* ===== CONTROL ROW ===== */
+.ctrl-row{display:flex;gap:8px;align-items:center;margin-bottom:16px;flex-wrap:wrap}
+.ctrl-row input{flex:1;min-width:140px;padding:10px 14px;border:1.5px solid #d0d7de;border-radius:8px;font-size:.9rem;outline:none;transition:.2s}
+.ctrl-row input:focus{border-color:#1890ff;box-shadow:0 0 0 3px rgba(24,144,255,.1)}
+.btn-primary{background:linear-gradient(135deg,#0f3460,#1565c0);color:#fff;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-size:.9rem;font-weight:600;white-space:nowrap;position:relative;overflow:hidden;transition:.2s;min-height:44px}
+.btn-primary::after{content:'';position:absolute;top:-50%;left:-75%;width:50%;height:200%;background:rgba(255,255,255,.15);transform:skewX(-20deg);transition:.5s}
+.btn-primary:hover::after{left:125%}
+.btn-primary:hover{box-shadow:0 4px 16px rgba(21,101,192,.4)}
+.btn-secondary{background:#fff;color:#0f3460;border:1.5px solid #0f3460;padding:10px 16px;border-radius:8px;cursor:pointer;font-size:.9rem;font-weight:600;white-space:nowrap;transition:.2s;min-height:44px}
+.btn-secondary:hover{background:#e3f2fd}
+.btn-icon{background:none;border:none;cursor:pointer;font-size:1.1rem;padding:6px;border-radius:6px;transition:.2s}
+.btn-icon:hover{background:#e3f2fd}
+
+/* ===== SEARCH DROPDOWN ===== */
+.search-wrap{position:relative;flex:1;min-width:140px}
+.search-dropdown{position:absolute;top:calc(100% + 4px);left:0;right:0;background:#fff;border:1.5px solid #d0d7de;border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.12);z-index:50;max-height:200px;overflow-y:auto;display:none}
+.search-dropdown.show{display:block}
+.search-item{padding:8px 14px;cursor:pointer;font-size:.88rem;border-bottom:1px solid #f0f0f0}
+.search-item:last-child{border-bottom:none}
+.search-item:hover{background:#e3f2fd}
+.search-item .code{color:#888;font-size:.8rem;margin-left:6px}
+
+/* ===== ANALYZE BUTTON ===== */
+.analyze-wrap{margin-bottom:20px}
+.btn-analyze{width:100%;padding:14px;background:linear-gradient(135deg,#0f3460,#1565c0,#0d47a1);color:#fff;border:none;border-radius:12px;font-size:1.05rem;font-weight:700;cursor:pointer;position:relative;overflow:hidden;transition:.2s;min-height:52px}
+.btn-analyze::after{content:'';position:absolute;top:-50%;left:-75%;width:50%;height:200%;background:rgba(255,255,255,.18);transform:skewX(-20deg);transition:.6s}
+.btn-analyze:hover::after{left:125%}
+.btn-analyze:hover{box-shadow:0 6px 24px rgba(13,71,161,.45)}
+.btn-analyze:disabled{opacity:.6;cursor:not-allowed}
+
+/* ===== STEPS ===== */
+.steps{display:flex;align-items:center;justify-content:center;gap:0;margin-bottom:12px}
+.step{display:flex;flex-direction:column;align-items:center;gap:4px}
+.step-circle{width:28px;height:28px;border-radius:50%;border:2px solid #d0d7de;background:#fff;display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:700;color:#999;transition:.3s}
+.step.active .step-circle{border-color:#1890ff;color:#1890ff;background:#e3f2fd}
+.step.done .step-circle{border-color:#52c41a;background:#52c41a;color:#fff}
+.step-label{font-size:.7rem;color:#999;white-space:nowrap}
+.step.active .step-label{color:#1890ff}
+.step.done .step-label{color:#52c41a}
+.step-line{flex:1;height:2px;background:#d0d7de;min-width:30px;transition:.3s}
+.step-line.done{background:#52c41a}
+
+/* ===== PROGRESS BAR ===== */
+.progress-wrap{margin-bottom:16px;display:none}
+.progress-wrap.show{display:block}
+.progress-bar{height:6px;background:#e0e0e0;border-radius:3px;overflow:hidden}
+.progress-fill{height:100%;background:linear-gradient(90deg,#1890ff,#42a5f5);border-radius:3px;transition:width .4s ease;width:0%}
+.progress-text{font-size:.78rem;color:#666;margin-top:4px;text-align:center}
+
+/* ===== SUMMARY BAR ===== */
+.summary-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.summary-item{background:#fff;border-radius:8px;padding:8px 14px;flex:1;min-width:100px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.summary-label{font-size:.72rem;color:#888;margin-bottom:2px}
+.summary-value{font-size:1.1rem;font-weight:700;color:#0f3460}
+.summary-pnl.pos{color:#e53935}
+.summary-pnl.neg{color:#52c41a}
+
+/* ===== FUND CARDS ===== */
+.cards{display:flex;flex-direction:column;gap:14px}
+.card{background:#fff;border-radius:14px;box-shadow:0 2px 12px rgba(0,0,0,.08);overflow:hidden;transition:.2s}
+.card:hover{box-shadow:0 4px 20px rgba(0,0,0,.13)}
+.card-header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;gap:8px;flex-wrap:wrap}
+.card-info{flex:1}
+.card-name{font-size:.98rem;font-weight:700;color:#1a1a2e}
+.card-code{font-size:.78rem;color:#888;margin-top:2px}
+.card-nav{text-align:right}
+.nav-value{font-size:1.15rem;font-weight:700}
+.nav-date{font-size:.72rem;color:#aaa;margin-top:1px}
+.card-actions{display:flex;gap:4px}
+
+/* ===== REALTIME ===== */
+.realtime-row{display:flex;align-items:center;gap:8px;padding:6px 16px;background:#f8f9fb;border-top:1px solid #f0f0f0;border-bottom:1px solid #f0f0f0;flex-wrap:wrap}
+.rt-label{font-size:.78rem;color:#888}
+.rt-value{font-size:1rem;font-weight:700}
+.rt-time{font-size:.72rem;color:#bbb;margin-left:auto}
+.up{color:#e53935}
+.dn{color:#52c41a}
+.flat{color:#faad14}
+
+/* ===== METRICS GRID ===== */
+.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;padding:12px 16px}
+.metric{background:#f8f9fb;border-radius:8px;padding:8px 10px;text-align:center}
+.metric-label{font-size:.7rem;color:#888;margin-bottom:3px}
+.metric-value{font-size:.92rem;font-weight:700}
+
+/* ===== PERIOD TABS ===== */
+.period-tabs{display:flex;gap:4px;padding:0 16px 8px}
+.period-tab{padding:4px 12px;border-radius:12px;font-size:.78rem;cursor:pointer;background:#f0f2f5;border:none;transition:.2s;font-weight:500}
+.period-tab.active{background:#0f3460;color:#fff}
+
+/* ===== HOLDING ===== */
+.holding-row{display:flex;gap:12px;align-items:center;padding:10px 16px;background:#fafafa;border-top:1px solid #f0f0f0;flex-wrap:wrap}
+.holding-item{font-size:.82rem}
+.holding-label{color:#888}
+.holding-value{font-weight:600;margin-left:3px}
+
+/* ===== SUGGESTION BADGE ===== */
+.suggestion-row{padding:8px 16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.suggestion-badge{padding:4px 12px;border-radius:20px;font-size:.8rem;font-weight:700;color:#fff}
+.badge-strong-buy{background:linear-gradient(135deg,#1b5e20,#2e7d32)}
+.badge-buy{background:linear-gradient(135deg,#2e7d32,#388e3c)}
+.badge-hold{background:linear-gradient(135deg,#e65100,#f57c00)}
+.badge-sell{background:linear-gradient(135deg,#b71c1c,#c62828)}
+.badge-strong-sell{background:linear-gradient(135deg,#880e4f,#ad1457)}
+.badge-score{font-size:.78rem;color:#888}
+
+/* ===== CANVAS CHART ===== */
+.chart-wrap{padding:4px 16px 12px;position:relative}
+canvas.fund-chart{width:100%;display:block;border-radius:8px}
+.chart-legend{display:flex;gap:12px;font-size:.72rem;color:#888;margin-top:4px;justify-content:flex-end}
+.legend-item{display:flex;align-items:center;gap:4px}
+.legend-dot{width:20px;height:2px;border-radius:1px}
+
+/* ===== NAV TABLE ===== */
+.nav-toggle{padding:6px 16px;font-size:.78rem;color:#1890ff;cursor:pointer;background:none;border:none;text-align:left;width:100%;border-top:1px solid #f0f0f0}
+.nav-toggle:hover{background:#f0f8ff}
+.nav-table-wrap{overflow-x:auto;max-height:200px;overflow-y:auto}
+.nav-table{width:100%;border-collapse:collapse;font-size:.8rem}
+.nav-table th{background:#f0f2f5;padding:6px 10px;font-weight:600;text-align:left;position:sticky;top:0}
+.nav-table td{padding:5px 10px;border-bottom:1px solid #f5f5f5}
+.nav-table tr:hover td{background:#fafafa}
+
+/* ===== AI PANEL ===== */
+.ai-panel{background:linear-gradient(135deg,#e8f0fe,#f0e8ff);border:1.5px solid #1890ff;border-radius:12px;padding:16px;margin-bottom:16px}
+.ai-header{font-weight:700;color:#0f3460;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.ai-content{font-size:.88rem;line-height:1.7;white-space:pre-wrap;color:#222;max-height:600px;overflow-y:auto}
+.ai-content:empty::before{content:'等待分析...';color:#aaa}
+
+/* ===== API KEY ===== */
+.key-section{margin-bottom:16px}
+.key-section details summary{cursor:pointer;font-size:.85rem;color:#666;padding:6px 0;user-select:none}
+.key-section details summary:hover{color:#1890ff}
+.key-row{display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap}
+.key-row input{flex:1;min-width:200px;padding:8px 12px;border:1.5px solid #d0d7de;border-radius:8px;font-size:.85rem;outline:none}
+.key-row input:focus{border-color:#1890ff}
+.key-status{font-size:.78rem;color:#888}
+
+/* ===== MODAL ===== */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;display:flex;align-items:center;justify-content:center;padding:16px}
+.modal{background:#fff;border-radius:14px;padding:24px;width:100%;max-width:400px;box-shadow:0 8px 32px rgba(0,0,0,.2)}
+.modal h3{margin-bottom:16px;color:#0f3460}
+.modal label{display:block;font-size:.85rem;color:#666;margin-bottom:4px;margin-top:12px}
+.modal input{width:100%;padding:9px 12px;border:1.5px solid #d0d7de;border-radius:8px;font-size:.9rem;outline:none}
+.modal input:focus{border-color:#1890ff}
+.modal-actions{display:flex;gap:8px;margin-top:20px;justify-content:flex-end}
+.btn-sm{padding:7px 16px;border-radius:8px;font-size:.88rem;cursor:pointer;border:none;font-weight:600}
+.btn-sm.primary{background:#0f3460;color:#fff}
+.btn-sm.danger{background:#e53935;color:#fff}
+.btn-sm.cancel{background:#f0f0f0;color:#333}
+
+/* ===== OCR ===== */
+.ocr-section{margin-bottom:16px}
+.ocr-section details summary{cursor:pointer;font-size:.85rem;color:#666;padding:6px 0}
+.ocr-section details summary:hover{color:#1890ff}
+.ocr-body{margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.ocr-body input[type=file]{font-size:.82rem;flex:1}
+.ocr-result{font-size:.8rem;color:#666;margin-top:6px}
+
+/* ===== EMPTY STATE ===== */
+.empty-state{text-align:center;padding:48px 16px;color:#bbb}
+.empty-state .icon{font-size:3rem;margin-bottom:12px}
+
+/* ===== TOAST ===== */
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:10px 20px;border-radius:10px;font-size:.88rem;z-index:999;opacity:0;transition:.3s;pointer-events:none;max-width:320px;text-align:center}
+.toast.show{opacity:1}
+
+/* ===== RESPONSIVE ===== */
+@media(max-width:600px){
+  .header-top{padding:10px 12px;gap:8px}
+  .header-title{font-size:1.1rem}
+  .timer-bar{padding:6px 12px;gap:6px}
+  .container{padding:10px}
+  .ctrl-row{gap:6px}
+  .ctrl-row input,.btn-primary,.btn-secondary{min-height:44px}
+  .metrics{grid-template-columns:repeat(2,1fr)}
+  .card-header{flex-direction:column;align-items:flex-start}
+  .card-nav{align-self:flex-end}
+  .summary-bar{gap:6px}
+  .summary-item{min-width:70px;padding:6px 8px}
+  .modal{max-width:95vw;padding:16px}
+  canvas.fund-chart{height:180px!important}
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="header">
+  <div class="header-top">
+    <div class="header-title">🤖 AI <span>基金分析师</span></div>
+    <div class="status-bar">
+      <span class="status-clock" id="clock">--:--:--</span>
+      <span class="trade-badge" id="tradeBadge">--</span>
+      <span id="statusMsg" style="color:#aac;font-size:.78rem"></span>
+    </div>
+  </div>
+  <div class="timer-bar">
+    <label>定时分析：</label>
+    <select id="timerInterval">
+      <option value="30">30分钟</option>
+      <option value="60" selected>1小时</option>
+      <option value="120">2小时</option>
+    </select>
+    <button class="btn-timer off" id="timerBtn" onclick="toggleTimer()">▶ 开启</button>
+    <span class="next-time" id="nextTime"></span>
+  </div>
+</header>
+
+<!-- MAIN -->
+<div class="container">
+
+  <!-- API KEY -->
+  <div class="key-section">
+    <details id="keyDetails">
+      <summary>🔑 DeepSeek API Key 设置 <span class="key-status" id="keyStatus"></span></summary>
+      <div class="key-row">
+        <input type="password" id="apiKeyInput" placeholder="sk-xxxxxxxxxxxxxxxx" oninput="saveApiKey()">
+        <span class="key-status" id="keyStatusInline"></span>
+      </div>
+    </details>
+  </div>
+
+  <!-- OCR UPLOAD -->
+  <div class="ocr-section">
+    <details>
+      <summary>📷 图片OCR识别基金代码</summary>
+      <div class="ocr-body">
+        <input type="file" id="ocrFile" accept="image/*" onchange="handleOcr(event)">
+        <button class="btn-secondary" onclick="document.getElementById('ocrFile').click()" style="font-size:.82rem;padding:6px 12px;min-height:36px">选择图片</button>
+      </div>
+      <div class="ocr-result" id="ocrResult"></div>
+    </details>
+  </div>
+
+  <!-- CTRL ROW -->
+  <div class="ctrl-row">
+    <div class="search-wrap">
+      <input type="text" id="codeInput" placeholder="输入基金代码或名称搜索" maxlength="20"
+        oninput="onSearchInput()" onkeydown="onSearchKey(event)">
+      <div class="search-dropdown" id="searchDropdown"></div>
+    </div>
+    <button class="btn-primary" onclick="addFundFromInput()">+ 添加</button>
+    <button class="btn-secondary" onclick="openEditModal(null)">📋 管理</button>
+  </div>
+
+  <!-- ANALYZE BUTTON -->
+  <div class="analyze-wrap">
+    <button class="btn-analyze" id="analyzeBtn" onclick="startAnalysis()">
+      🧠 一键获取数据 &amp; AI深度分析
+    </button>
+  </div>
+
+  <!-- STEPS -->
+  <div class="steps" id="stepsRow" style="display:none">
+    <div class="step" id="step0">
+      <div class="step-circle">1</div>
+      <div class="step-label">拉取数据</div>
+    </div>
+    <div class="step-line" id="line01"></div>
+    <div class="step" id="step1">
+      <div class="step-circle">2</div>
+      <div class="step-label">计算指标</div>
+    </div>
+    <div class="step-line" id="line12"></div>
+    <div class="step" id="step2">
+      <div class="step-circle">3</div>
+      <div class="step-label">AI分析</div>
+    </div>
+  </div>
+
+  <!-- PROGRESS -->
+  <div class="progress-wrap" id="progressWrap">
+    <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+    <div class="progress-text" id="progressText"></div>
+  </div>
+
+  <!-- SUMMARY BAR -->
+  <div class="summary-bar">
+    <div class="summary-item"><div class="summary-label">监控数</div><div class="summary-value" id="sumTotal">0</div></div>
+    <div class="summary-item"><div class="summary-label">买入</div><div class="summary-value" id="sumBuy">0</div></div>
+    <div class="summary-item"><div class="summary-label">持有</div><div class="summary-value" id="sumHold">0</div></div>
+    <div class="summary-item"><div class="summary-label">卖出</div><div class="summary-value" id="sumSell">0</div></div>
+    <div class="summary-item"><div class="summary-label">总盈亏</div><div class="summary-value summary-pnl" id="sumPnl">--</div></div>
+  </div>
+
+  <!-- FUND CARDS -->
+  <div class="cards" id="cardsContainer">
+    <div class="empty-state"><div class="icon">📊</div><div>暂无基金，请添加代码</div></div>
+  </div>
+
+  <!-- AI PANEL -->
+  <div class="ai-panel" id="aiPanel" style="display:none;margin-top:16px">
+    <div class="ai-header">🤖 AI 深度分析报告</div>
+    <div class="ai-content" id="aiContent"></div>
+  </div>
+
+</div>
+
+<!-- EDIT MODAL -->
+<div class="modal-overlay" id="modalOverlay" style="display:none" onclick="closeModal(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <h3 id="modalTitle">编辑持仓</h3>
+    <label>基金代码</label>
+    <input type="text" id="mCode" readonly style="background:#f5f5f5;color:#888">
+    <label>基金名称</label>
+    <input type="text" id="mName" readonly style="background:#f5f5f5;color:#888">
+    <label>持仓金额 (元)</label>
+    <input type="number" id="mAmount" placeholder="0" min="0" step="100">
+    <label>成本净值</label>
+    <input type="number" id="mCost" placeholder="0.0000" step="0.0001" min="0">
+    <div class="modal-actions">
+      <button class="btn-sm danger" onclick="removeFund()">删除</button>
+      <button class="btn-sm cancel" onclick="closeModal()">取消</button>
+      <button class="btn-sm primary" onclick="saveModal()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ============================================================
+// CONSTANTS & STATE
+// ============================================================
+const DEFAULT_CODES = ['015740','017470','161226','023551'];
+const LS_CODES = 'afm_codes';
+const LS_FUNDS = 'afm_funds';
+const LS_KEY   = 'afm_dskey';
+const FETCH_TIMEOUT_MS = 12000;
+const DEEPSEEK_MODEL   = 'deepseek-chat';
+const SCORE_W_PERIOD = 0.35, SCORE_W_RET5 = 0.25, SCORE_W_CONSEC = 0.8, SCORE_W_ROC = 0.15;
+
+let funds = {};      // code -> {code,name,amount,cost}
+let fundData = {};   // code -> computed data
+let currentPeriod = '1m';
+let timerRunning = false;
+let timerHandle = null;
+let nextRunTime = null;
+let editingCode = null;
+let searchTimer = null;
+let isAnalyzing = false;
+
+// ============================================================
+// INIT
+// ============================================================
+function init() {
+  loadFundsFromLS();
+  loadApiKey();
+  renderClock();
+  setInterval(renderClock, 1000);
+  renderCards();
+  updateSummary();
+}
+
+function loadFundsFromLS() {
+  const codes = JSON.parse(localStorage.getItem(LS_CODES) || 'null') || DEFAULT_CODES;
+  const saved  = JSON.parse(localStorage.getItem(LS_FUNDS) || '{}');
+  funds = {};
+  codes.forEach(c => {
+    funds[c] = saved[c] || {code:c, name:c, amount:0, cost:0};
+  });
+}
+
+function saveFundsToLS() {
+  localStorage.setItem(LS_CODES, JSON.stringify(Object.keys(funds)));
+  localStorage.setItem(LS_FUNDS, JSON.stringify(funds));
+}
+
+function loadApiKey() {
+  const k = localStorage.getItem(LS_KEY) || '';
+  document.getElementById('apiKeyInput').value = k;
+  updateKeyStatus(k);
+}
+
+function saveApiKey() {
+  const k = document.getElementById('apiKeyInput').value.trim();
+  localStorage.setItem(LS_KEY, k);
+  updateKeyStatus(k);
+}
+
+function updateKeyStatus(k) {
+  const st = k ? '✅ 已设置' : '❌ 未设置';
+  document.getElementById('keyStatus').textContent = st;
+  document.getElementById('keyStatusInline').textContent = k ? '✅ Key已保存' : '';
+}
+
+// ============================================================
+// CLOCK & TRADE STATUS
+// ============================================================
+function renderClock() {
+  const now = new Date();
+  document.getElementById('clock').textContent = now.toLocaleTimeString('zh-CN');
+  const h = now.getHours(), m = now.getMinutes();
+  const day = now.getDay();
+  const isWeekday = day >= 1 && day <= 5;
+  const isMorning = (h === 9 && m >= 30) || (h >= 10 && h < 11) || (h === 11 && m <= 30);
+  const isAfternoon = (h >= 13 && h < 15) || (h === 15 && m === 0);
+  const isOpen = isWeekday && (isMorning || isAfternoon);
+  const badge = document.getElementById('tradeBadge');
+  badge.textContent = isOpen ? '交易中' : '已收盘';
+  badge.className = 'trade-badge ' + (isOpen ? 'trade-open' : 'trade-closed');
+}
+
+// ============================================================
+// TIMER
+// ============================================================
+function toggleTimer() {
+  timerRunning = !timerRunning;
+  const btn = document.getElementById('timerBtn');
+  if (timerRunning) {
+    btn.textContent = '⏸ 关闭';
+    btn.className = 'btn-timer on';
+    scheduleNext();
+  } else {
+    btn.textContent = '▶ 开启';
+    btn.className = 'btn-timer off';
+    clearTimeout(timerHandle);
+    document.getElementById('nextTime').textContent = '';
+  }
+}
+
+function scheduleNext() {
+  if (!timerRunning) return;
+  const mins = parseInt(document.getElementById('timerInterval').value);
+  const ms = mins * 60 * 1000;
+  nextRunTime = Date.now() + ms;
+  clearTimeout(timerHandle);
+  timerHandle = setTimeout(() => { startAnalysis(); scheduleNext(); }, ms);
+  updateNextTime();
+}
+
+function updateNextTime() {
+  if (!timerRunning || !nextRunTime) return;
+  const rem = Math.max(0, Math.round((nextRunTime - Date.now()) / 1000));
+  const mm = String(Math.floor(rem / 60)).padStart(2,'0');
+  const ss = String(rem % 60).padStart(2,'0');
+  document.getElementById('nextTime').textContent = `下次: ${mm}:${ss}`;
+  setTimeout(updateNextTime, 1000);
+}
+
+// ============================================================
+// FUND MANAGEMENT
+// ============================================================
+function addFundFromInput() {
+  const val = document.getElementById('codeInput').value.trim();
+  if (!val) { showToast('请输入基金代码'); return; }
+  const code = val.replace(/\D/g,'').slice(0,6);
+  if (code.length !== 6) { showToast('请输入6位基金代码'); return; }
+  if (funds[code]) { showToast('该基金已添加'); return; }
+  funds[code] = {code, name:code, amount:0, cost:0};
+  saveFundsToLS();
+  document.getElementById('codeInput').value = '';
+  document.getElementById('searchDropdown').classList.remove('show');
+  renderCards();
+  updateSummary();
+  showToast('已添加 ' + code);
+}
+
+function removeFund() {
+  if (!editingCode) return;
+  if (!confirm('确认删除 ' + editingCode + '？')) return;
+  delete funds[editingCode];
+  delete fundData[editingCode];
+  saveFundsToLS();
+  closeModal();
+  renderCards();
+  updateSummary();
+  showToast('已删除');
+}
+
+function openEditModal(code) {
+  editingCode = code;
+  const f = code ? funds[code] : null;
+  document.getElementById('mCode').value = f ? f.code : '';
+  document.getElementById('mName').value = f ? (f.name || f.code) : '';
+  document.getElementById('mAmount').value = f ? (f.amount || '') : '';
+  document.getElementById('mCost').value = f ? (f.cost || '') : '';
+  document.getElementById('modalTitle').textContent = f ? '编辑持仓 - ' + (f.name || f.code) : '管理基金';
+  document.getElementById('modalOverlay').style.display = 'flex';
+}
+
+function saveModal() {
+  if (!editingCode) { closeModal(); return; }
+  funds[editingCode].amount = parseFloat(document.getElementById('mAmount').value) || 0;
+  funds[editingCode].cost   = parseFloat(document.getElementById('mCost').value)   || 0;
+  saveFundsToLS();
+  closeModal();
+  renderCards();
+  updateSummary();
+  showToast('已保存');
+}
+
+function closeModal(e) {
+  if (e && e.target !== document.getElementById('modalOverlay')) return;
+  document.getElementById('modalOverlay').style.display = 'none';
+  editingCode = null;
+}
+
+// ============================================================
+// SEARCH
+// ============================================================
+function onSearchInput() {
+  clearTimeout(searchTimer);
+  const v = document.getElementById('codeInput').value.trim();
+  if (!v) { document.getElementById('searchDropdown').classList.remove('show'); return; }
+  if (/^\d{6}$/.test(v)) { document.getElementById('searchDropdown').classList.remove('show'); return; }
+  searchTimer = setTimeout(() => doSearch(v), 400);
+}
+
+function onSearchKey(e) {
+  if (e.key === 'Enter') addFundFromInput();
+}
+
+function doSearch(kw) {
+  const cb = 'afm_search_' + Date.now();
+  const url = `https://fundsuggest.eastmoney.com/FundSearch/api/FundSearchAPI.ashx?m=1&key=${encodeURIComponent(kw)}&callback=${cb}`;
+  loadScript(url, cb, (data) => {
+    const items = data && data.Datas ? data.Datas : [];
+    renderSearchDropdown(items.slice(0,8));
+  }, () => {
+    document.getElementById('searchDropdown').classList.remove('show');
+  }, 8000);
+}
+
+function renderSearchDropdown(items) {
+  const dd = document.getElementById('searchDropdown');
+  if (!items.length) { dd.classList.remove('show'); return; }
+  dd.innerHTML = items.map(it =>
+    `<div class="search-item" onclick="selectSearch('${it.CODE}','${escHtml(it.NAME)}')">
+      ${escHtml(it.NAME)}<span class="code">${it.CODE}</span>
+    </div>`
+  ).join('');
+  dd.classList.add('show');
+}
+
+function selectSearch(code, name) {
+  document.getElementById('codeInput').value = code;
+  document.getElementById('searchDropdown').classList.remove('show');
+  if (!funds[code]) {
+    funds[code] = {code, name, amount:0, cost:0};
+    saveFundsToLS();
+    renderCards();
+    updateSummary();
+    showToast('已添加 ' + name);
+  } else {
+    showToast('已存在: ' + name);
+  }
+}
+
+document.addEventListener('click', e => {
+  if (!document.getElementById('codeInput').contains(e.target)) {
+    document.getElementById('searchDropdown').classList.remove('show');
+  }
+});
+
+// ============================================================
+// SCRIPT LOADER (JSONP helper)
+// ============================================================
+function loadScript(url, callbackName, onSuccess, onError, timeout) {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    let done = false;
+    const tid = setTimeout(() => {
+      if (done) return;
+      done = true;
+      cleanup();
+      if (onError) onError(new Error('timeout'));
+      reject(new Error('timeout'));
+    }, timeout || FETCH_TIMEOUT_MS);
+
+    function cleanup() {
+      clearTimeout(tid);
+      if (s.parentNode) s.parentNode.removeChild(s);
+      if (callbackName && window[callbackName] === handler) delete window[callbackName];
+    }
+
+    function handler(data) {
+      if (done) return;
+      done = true;
+      cleanup();
+      if (onSuccess) onSuccess(data);
+      resolve(data);
+    }
+
+    if (callbackName) window[callbackName] = handler;
+
+    s.onerror = () => {
+      if (done) return;
+      done = true;
+      cleanup();
+      if (onError) onError(new Error('load error'));
+      reject(new Error('load error'));
+    };
+
+    if (!callbackName) {
+      s.onload = () => {
+        if (done) return;
+        done = true;
+        cleanup();
+        if (onSuccess) onSuccess();
+        resolve();
+      };
+    }
+
+    s.src = url;
+    document.head.appendChild(s);
+  });
+}
+
+// ============================================================
+// DATA FETCHING
+// ============================================================
+async function fetchRealtime(code) {
+  const cb = 'jsonpgz';
+  const prev = window[cb];
+  return new Promise((resolve) => {
+    const url = `https://fundgz.1234567.com.cn/js/${code}.js?callback=${cb}&_=${Date.now()}`;
+    let done = false;
+    const tid = setTimeout(() => {
+      if (done) return;
+      done = true;
+      window[cb] = prev;
+      if (s.parentNode) s.parentNode.removeChild(s);
+      resolve(null);
+    }, FETCH_TIMEOUT_MS);
+
+    const s = document.createElement('script');
+    window[cb] = (data) => {
+      if (done) return;
+      done = true;
+      clearTimeout(tid);
+      window[cb] = prev;
+      if (s.parentNode) s.parentNode.removeChild(s);
+      resolve(data);
+    };
+    s.onerror = () => {
+      if (done) return;
+      done = true;
+      clearTimeout(tid);
+      window[cb] = prev;
+      if (s.parentNode) s.parentNode.removeChild(s);
+      resolve(null);
+    };
+    s.src = url;
+    document.head.appendChild(s);
+  });
+}
+
+async function fetchHistory(code) {
+  return new Promise((resolve) => {
+    // Save globals we might overwrite
+    const savedVars = {};
+    const GLOBALS = ['fS_name','fS_code','Data_netWorthTrend','Data_grandTotal',
+                     'Data_rateInSimilarType','Data_performanceEvaluation'];
+    GLOBALS.forEach(k => { savedVars[k] = window[k]; delete window[k]; });
+
+    const url = `https://fund.eastmoney.com/pingzhongdata/${code}.js?v=${Date.now()}`;
+    const s = document.createElement('script');
+    let done = false;
+    const tid = setTimeout(() => {
+      if (done) return;
+      done = true;
+      if (s.parentNode) s.parentNode.removeChild(s);
+      GLOBALS.forEach(k => { window[k] = savedVars[k]; });
+      resolve(null);
+    }, FETCH_TIMEOUT_MS);
+
+    s.onload = () => {
+      if (done) return;
+      done = true;
+      clearTimeout(tid);
+      if (s.parentNode) s.parentNode.removeChild(s);
+      const result = {
+        name: window['fS_name'],
+        code: window['fS_code'],
+        trend: window['Data_netWorthTrend'],
+        grandTotal: window['Data_grandTotal']
+      };
+      GLOBALS.forEach(k => { window[k] = savedVars[k]; });
+      resolve(result);
+    };
+    s.onerror = () => {
+      if (done) return;
+      done = true;
+      clearTimeout(tid);
+      if (s.parentNode) s.parentNode.removeChild(s);
+      GLOBALS.forEach(k => { window[k] = savedVars[k]; });
+      resolve(null);
+    };
+    s.src = url;
+    document.head.appendChild(s);
+  });
+}
+
+// ============================================================
+// PERIOD FILTER
+// ============================================================
+function getPeriodDays(p) {
+  return {w1:7, '1m':30, '3m':90, '6m':180}[p] || 30;
+}
+
+function filterTrend(trend, period) {
+  if (!trend || !trend.length) return [];
+  const days = getPeriodDays(period);
+  const cutoff = Date.now() - days * 86400000;
+  return trend.filter(d => d.x >= cutoff);
+}
+
+// ============================================================
+// INDICATOR CALCULATION
+// ============================================================
+function calcIndicators(trend, period) {
+  const pts = filterTrend(trend, period);
+  if (!pts || pts.length < 2) return null;
+
+  const navs = pts.map(p => p.y);
+  const n = navs.length;
+
+  // Period return
+  const periodReturn = n >= 2 ? ((navs[n-1] - navs[0]) / navs[0]) * 100 : 0;
+
+  // Daily return (last day)
+  const dailyReturn = n >= 2 ? ((navs[n-1] - navs[n-2]) / navs[n-2]) * 100 : 0;
+
+  // 3-day return
+  const ret3 = n >= 4 ? ((navs[n-1] - navs[n-4]) / navs[n-4]) * 100 : dailyReturn;
+
+  // 5-day return
+  const ret5 = n >= 6 ? ((navs[n-1] - navs[n-6]) / navs[n-6]) * 100 : periodReturn;
+
+  // Consecutive days
+  let consecutive = 0;
+  if (n >= 2) {
+    const dir = navs[n-1] >= navs[n-2] ? 1 : -1;
+    for (let i = n-1; i >= 1; i--) {
+      if ((navs[i] - navs[i-1]) * dir >= 0) consecutive++;
+      else break;
+    }
+    consecutive *= dir;
+  }
+
+  // ROC (Rate of Change, 5-day)
+  const roc = n >= 6 ? ((navs[n-1] - navs[n-6]) / navs[n-6]) * 100 : 0;
+
+  // Volatility (std dev of daily returns)
+  const dailyRets = [];
+  for (let i = 1; i < navs.length; i++) {
+    dailyRets.push((navs[i] - navs[i-1]) / navs[i-1] * 100);
+  }
+  const mean = dailyRets.reduce((a,b) => a+b, 0) / dailyRets.length;
+  const variance = dailyRets.reduce((a,b) => a + (b-mean)**2, 0) / dailyRets.length;
+  const volatility = Math.sqrt(variance);
+
+  // MA5 / MA20
+  function ma(arr, len) {
+    if (arr.length < len) return null;
+    return arr.slice(-len).reduce((a,b)=>a+b,0) / len;
+  }
+  const ma5  = ma(navs, 5);
+  const ma10 = ma(navs, 10);
+  const ma20 = ma(navs, 20);
+
+  // Score
+  let score = periodReturn * SCORE_W_PERIOD + ret5 * SCORE_W_RET5 + consecutive * SCORE_W_CONSEC + roc * SCORE_W_ROC;
+  if (ma5 !== null && ma20 !== null) {
+    score += ma5 > ma20 ? 0.5 : -0.5;
+  }
+
+  return {
+    periodReturn, dailyReturn, ret3, ret5,
+    consecutive, roc, volatility,
+    ma5, ma10, ma20, score,
+    nav: navs[n-1],
+    navDate: pts[n-1].x,
+    navPrev: navs[n-2] || navs[n-1]
+  };
+}
+
+function getSuggestion(score) {
+  if (score < -6) return {label:'强烈加仓', cls:'badge-strong-buy', color:'#52c41a'};
+  if (score < -3) return {label:'买入',     cls:'badge-buy',        color:'#73d13d'};
+  if (score <  3) return {label:'观望',     cls:'badge-hold',       color:'#faad14'};
+  if (score <  6) return {label:'卖出',     cls:'badge-sell',       color:'#ff7875'};
+  return               {label:'大幅减仓', cls:'badge-strong-sell', color:'#f5222d'};
+}
+
+// ============================================================
+// MAIN ANALYSIS FLOW
+// ============================================================
+async function startAnalysis() {
+  if (isAnalyzing) return;
+  const codes = Object.keys(funds);
+  if (!codes.length) { showToast('请先添加基金'); return; }
+
+  isAnalyzing = true;
+  document.getElementById('analyzeBtn').disabled = true;
+  document.getElementById('stepsRow').style.display = 'flex';
+  document.getElementById('progressWrap').classList.add('show');
+  setStep(0);
+  setProgress(5, '正在拉取基金数据...');
+
+  // Step 1: Fetch data
+  const total = codes.length;
+  for (let i = 0; i < total; i++) {
+    const code = codes[i];
+    setProgress(5 + Math.round(i / total * 40), `拉取 ${code} (${i+1}/${total})...`);
+    try {
+      const [hist, rt] = await Promise.all([
+        fetchHistory(code),
+        fetchRealtime(code)
+      ]);
+      if (hist && hist.name) {
+        funds[code].name = hist.name;
+      }
+      fundData[code] = {hist, rt};
+    } catch(e) {
+      fundData[code] = {hist:null, rt:null};
+    }
+  }
+  saveFundsToLS();
+
+  // Step 2: Calc indicators
+  setStep(1);
+  setProgress(50, '计算技术指标...');
+  await delay(300);
+
+  const computed = {};
+  codes.forEach(code => {
+    const {hist} = fundData[code] || {};
+    const trend = hist && hist.trend;
+    computed[code] = calcIndicators(trend, currentPeriod);
+  });
+
+  setProgress(65, '渲染卡片...');
+  await delay(100);
+  renderCards(computed);
+  updateSummary(computed);
+
+  // Step 3: AI analysis
+  setStep(2);
+  setProgress(70, '准备AI分析...');
+
+  const apiKey = localStorage.getItem(LS_KEY) || '';
+  if (!apiKey) {
+    setProgress(100, 'AI分析已跳过（未设置Key）');
+    showToast('数据已更新，未设置DeepSeek Key，跳过AI分析');
+    document.getElementById('keyDetails').open = true;
+  } else {
+    setProgress(75, 'AI深度分析中...');
+    document.getElementById('aiPanel').style.display = 'block';
+    document.getElementById('aiContent').textContent = '';
+    await runAiAnalysis(codes, computed, apiKey);
+    setProgress(100, 'AI分析完成');
+  }
+
+  setStepDone(2);
+  await delay(1500);
+  document.getElementById('stepsRow').style.display = 'none';
+  document.getElementById('progressWrap').classList.remove('show');
+  isAnalyzing = false;
+  document.getElementById('analyzeBtn').disabled = false;
+}
+
+function setStep(n) {
+  for (let i=0; i<3; i++) {
+    const el = document.getElementById('step'+i);
+    el.className = 'step' + (i < n ? ' done' : i === n ? ' active' : '');
+  }
+  if (n > 0) document.getElementById('line01').className = 'step-line' + (n > 1 ? ' done' : '');
+  if (n > 1) document.getElementById('line12').className = 'step-line done';
+}
+
+function setStepDone(n) {
+  document.getElementById('step'+n).className = 'step done';
+}
+
+function setProgress(pct, txt) {
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressText').textContent = txt;
+}
+
+function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ============================================================
+// AI ANALYSIS
+// ============================================================
+async function runAiAnalysis(codes, computed, apiKey) {
+  const userMsg = buildUserPrompt(codes, computed);
+
+  const systemPrompt = `你是一位拥有20年实战经验的资深基金经理，曾管理过百亿级基金规模，擅长技术分析、趋势判断和仓位管理。你的分析风格：
+1. 不做简单的阈值判断（不是涨了5%就喊卖、跌了5%就喊买）
+2. 会分析趋势的持续性：如果一只基金刚启动上涨趋势（连涨2-3天但动量仍在增强），你会建议继续持有甚至加仓，而不是急着卖
+3. 会结合多个维度：连续涨跌天数、动量变化、均线关系(MA5/MA10/MA20)、波动率、历史走势形态
+4. 核心策略是"越涨越卖，越跌越买"，但执行时讲究节奏和时机
+5. 会给出具体的操作金额或比例建议，而不是模糊的"适当买入"
+6. 会关注趋势拐点信号：如连续下跌后首次翻红、连涨后动量衰减等
+注意：你的分析仅供参考，不构成投资建议。`;
+
+  try {
+    const resp = await fetch('https://api.deepseek.com/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + apiKey
+      },
+      body: JSON.stringify({
+        model: DEEPSEEK_MODEL,
+        stream: true,
+        messages: [
+          {role:'system', content: systemPrompt},
+          {role:'user',   content: userMsg}
+        ]
+      })
+    });
+
+    if (!resp.ok) {
+      const err = await resp.text();
+      document.getElementById('aiContent').textContent = '❌ API错误: ' + resp.status + ' ' + err;
+      return;
+    }
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let aiEl = document.getElementById('aiContent');
+
+    while (true) {
+      const {done, value} = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, {stream:true});
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+      for (const line of lines) {
+        if (!line.startsWith('data:')) continue;
+        const data = line.slice(5).trim();
+        if (data === '[DONE]') continue;
+        try {
+          const j = JSON.parse(data);
+          const delta = j.choices && j.choices[0] && j.choices[0].delta && j.choices[0].delta.content;
+          if (delta) {
+            aiEl.textContent += delta;
+            aiEl.scrollTop = aiEl.scrollHeight;
+          }
+        } catch(_) {}
+      }
+    }
+  } catch(e) {
+    document.getElementById('aiContent').textContent = '❌ 请求失败: ' + e.message;
+  }
+}
+
+function buildUserPrompt(codes, computed) {
+  const today = new Date().toLocaleDateString('zh-CN');
+  let msg = `请对以下基金组合进行深度分析（数据日期：${today}）。\n\n`;
+
+  codes.forEach(code => {
+    const f = funds[code];
+    const c = computed[code];
+    const rt = fundData[code] && fundData[code].rt;
+    msg += `【${f.name || code}】(${code})\n`;
+    if (c) {
+      msg += `  最新净值: ${fmt4(c.nav)} (${new Date(c.navDate).toLocaleDateString('zh-CN')})\n`;
+      msg += `  日涨跌: ${fmtPct(c.dailyReturn)}\n`;
+      msg += `  区间涨跌(${currentPeriod}): ${fmtPct(c.periodReturn)}\n`;
+      msg += `  近3日: ${fmtPct(c.ret3)}  近5日: ${fmtPct(c.ret5)}\n`;
+      msg += `  连续${c.consecutive > 0 ? '上涨' : '下跌'}${Math.abs(c.consecutive)}天\n`;
+      msg += `  ROC: ${fmtPct(c.roc)}  波动率: ${fmtPct(c.volatility)}\n`;
+      if (c.ma5) msg += `  MA5: ${fmt4(c.ma5)}  MA20: ${c.ma20 ? fmt4(c.ma20) : 'N/A'}\n`;
+      msg += `  综合评分: ${c.score.toFixed(2)}  建议: ${getSuggestion(c.score).label}\n`;
+    }
+    if (rt) {
+      msg += `  实时估值: ${rt.gsz || '--'}  估算涨幅: ${rt.gszzl || '--'}%\n`;
+    }
+    if (f.amount > 0) {
+      msg += `  持仓金额: ¥${f.amount}  成本净值: ${f.cost || '未设置'}\n`;
+      if (c && f.cost > 0) {
+        const pnlPct = (c.nav - f.cost) / f.cost * 100;
+        const pnlAmt = f.amount * (c.nav - f.cost) / f.cost;
+        msg += `  当前盈亏: ${fmtPct(pnlPct)} (${pnlAmt >= 0 ? '+' : ''}¥${pnlAmt.toFixed(0)})\n`;
+      }
+    }
+    msg += '\n';
+  });
+
+  msg += `请按以下结构输出分析：
+1. 大盘环境判断（结合各基金涨跌情况推断市场风格）
+2. 逐只基金深度分析（走势判断/预判方向/具体操作建议/关键价位）
+3. 组合整体建议（仓位分配/风险平衡）
+4. 今日操作清单（具体金额或比例，可执行的操作步骤）`;
+
+  return msg;
+}
+
+// ============================================================
+// RENDER CARDS
+// ============================================================
+function renderCards(computed) {
+  const container = document.getElementById('cardsContainer');
+  const codes = Object.keys(funds);
+  if (!codes.length) {
+    container.innerHTML = '<div class="empty-state"><div class="icon">📊</div><div>暂无基金，请添加代码</div></div>';
+    return;
+  }
+  container.innerHTML = codes.map(code => buildCard(code, computed && computed[code])).join('');
+  codes.forEach(code => {
+    const c = computed && computed[code];
+    if (c) {
+      const trend = fundData[code] && fundData[code].hist && fundData[code].hist.trend;
+      if (trend) drawChart(code, filterTrend(trend, currentPeriod));
+    }
+  });
+}
+
+function buildCard(code, c) {
+  const f = funds[code];
+  const name = f.name || code;
+  const rt = fundData[code] && fundData[code].rt;
+
+  const navVal = c ? fmt4(c.nav) : '--';
+  const navDate = c ? new Date(c.navDate).toLocaleDateString('zh-CN') : '--';
+  const navCls  = c ? (c.dailyReturn > 0 ? 'up' : c.dailyReturn < 0 ? 'dn' : 'flat') : '';
+
+  const rtVal  = rt ? rt.gsz    : '--';
+  const rtPct  = rt ? rt.gszzl  : '--';
+  const rtTime = rt ? rt.gztime : '';
+  const rtCls  = rt ? (parseFloat(rt.gszzl) > 0 ? 'up' : parseFloat(rt.gszzl) < 0 ? 'dn' : 'flat') : '';
+
+  const sg = c ? getSuggestion(c.score) : null;
+
+  // Holding P&L
+  let holdHtml = '';
+  if (f.amount > 0 && c && f.cost > 0) {
+    const pnlPct = (c.nav - f.cost) / f.cost * 100;
+    const pnlAmt = f.amount * (c.nav - f.cost) / f.cost;
+    const pcls   = pnlAmt >= 0 ? 'up' : 'dn';
+    holdHtml = `<div class="holding-row">
+      <div class="holding-item"><span class="holding-label">持仓</span><span class="holding-value">¥${fmt0(f.amount)}</span></div>
+      <div class="holding-item"><span class="holding-label">成本</span><span class="holding-value">${fmt4(f.cost)}</span></div>
+      <div class="holding-item"><span class="holding-label">盈亏</span><span class="holding-value ${pcls}">${pnlAmt>=0?'+':''}¥${fmt0(pnlAmt)} (${pnlPct>=0?'+':''}${pnlPct.toFixed(2)}%)</span></div>
+    </div>`;
+  }
+
+  const metricsHtml = c ? `
+    <div class="metrics">
+      <div class="metric"><div class="metric-label">日涨跌</div><div class="metric-value ${c.dailyReturn>=0?'up':'dn'}">${fmtPct(c.dailyReturn)}</div></div>
+      <div class="metric"><div class="metric-label">区间涨跌</div><div class="metric-value ${c.periodReturn>=0?'up':'dn'}">${fmtPct(c.periodReturn)}</div></div>
+      <div class="metric"><div class="metric-label">近3日</div><div class="metric-value ${c.ret3>=0?'up':'dn'}">${fmtPct(c.ret3)}</div></div>
+      <div class="metric"><div class="metric-label">近5日</div><div class="metric-value ${c.ret5>=0?'up':'dn'}">${fmtPct(c.ret5)}</div></div>
+      <div class="metric"><div class="metric-label">连续天数</div><div class="metric-value ${c.consecutive>=0?'up':'dn'}">${c.consecutive>0?'+':''}${c.consecutive}天</div></div>
+      <div class="metric"><div class="metric-label">ROC</div><div class="metric-value ${c.roc>=0?'up':'dn'}">${fmtPct(c.roc)}</div></div>
+      <div class="metric"><div class="metric-label">波动率</div><div class="metric-value flat">${fmtPct(c.volatility)}</div></div>
+      <div class="metric"><div class="metric-label">MA5</div><div class="metric-value">${c.ma5?fmt4(c.ma5):'--'}</div></div>
+      <div class="metric"><div class="metric-label">MA20</div><div class="metric-value">${c.ma20?fmt4(c.ma20):'--'}</div></div>
+    </div>` : '';
+
+  const sgHtml = sg ? `<div class="suggestion-row">
+    <span class="suggestion-badge ${sg.cls}">${sg.label}</span>
+    <span class="badge-score">评分: ${c.score.toFixed(2)}</span>
+  </div>` : '';
+
+  const periodTabsHtml = `<div class="period-tabs">
+    ${['w1','1m','3m','6m'].map(p =>
+      `<button class="period-tab${p===currentPeriod?' active':''}" onclick="switchPeriod('${p}','${code}')">${{w1:'1周','1m':'1月','3m':'3月','6m':'6月'}[p]}</button>`
+    ).join('')}
+  </div>`;
+
+  return `<div class="card" id="card-${code}">
+    <div class="card-header">
+      <div class="card-info">
+        <div class="card-name">${escHtml(name)}</div>
+        <div class="card-code">${code}</div>
+      </div>
+      <div class="card-nav">
+        <div class="nav-value ${navCls}">${navVal}</div>
+        <div class="nav-date">${navDate}</div>
+      </div>
+      <div class="card-actions">
+        <button class="btn-icon" title="编辑" onclick="openEditModal('${code}')">✏️</button>
+      </div>
+    </div>
+
+    ${rt ? `<div class="realtime-row">
+      <span class="rt-label">实时估值</span>
+      <span class="rt-value ${rtCls}">${rtVal}</span>
+      <span class="rt-value ${rtCls}" style="font-size:.85rem;margin-left:4px">${rtPct !== '--' ? (parseFloat(rtPct)>=0?'+':'')+rtPct+'%' : ''}</span>
+      <span class="rt-time">${rtTime}</span>
+    </div>` : ''}
+
+    ${metricsHtml}
+    ${sgHtml}
+    ${periodTabsHtml}
+    ${holdHtml}
+
+    <div class="chart-wrap">
+      <canvas id="chart-${code}" class="fund-chart" height="200"></canvas>
+      <div class="chart-legend">
+        <div class="legend-item"><div class="legend-dot" style="background:#faad14;border-top:2px dashed #faad14;height:0"></div><span>MA5</span></div>
+        <div class="legend-item"><div class="legend-dot" style="background:#1890ff;border-top:2px dashed #1890ff;height:0"></div><span>MA20</span></div>
+        <div class="legend-item"><div class="legend-dot" style="background:#e53935"></div><span>净值</span></div>
+      </div>
+    </div>
+
+    <button class="nav-toggle" onclick="toggleNavTable('${code}')">📋 展开净值明细</button>
+    <div id="navtable-${code}" style="display:none"></div>
+  </div>`;
+}
+
+function switchPeriod(period, code) {
+  currentPeriod = period;
+  // Re-render all cards with new period
+  const codes = Object.keys(funds);
+  const computed = {};
+  codes.forEach(c => {
+    const trend = fundData[c] && fundData[c].hist && fundData[c].hist.trend;
+    computed[c] = calcIndicators(trend, currentPeriod);
+  });
+  renderCards(computed);
+  updateSummary(computed);
+}
+
+function toggleNavTable(code) {
+  const wrap = document.getElementById('navtable-' + code);
+  if (!wrap) return;
+  if (wrap.style.display !== 'none') {
+    wrap.style.display = 'none';
+    return;
+  }
+  const trend = fundData[code] && fundData[code].hist && fundData[code].hist.trend;
+  if (!trend || !trend.length) { wrap.innerHTML = '<p style="padding:8px 16px;color:#888;font-size:.8rem">暂无数据</p>'; wrap.style.display='block'; return; }
+  const pts = filterTrend(trend, currentPeriod).slice(-30).reverse();
+  wrap.innerHTML = `<div class="nav-table-wrap"><table class="nav-table">
+    <thead><tr><th>日期</th><th>净值</th><th>日涨跌</th></tr></thead>
+    <tbody>${pts.map((p,i) => {
+      const prev = pts[i+1];
+      const chg = prev ? ((p.y - prev.y) / prev.y * 100) : 0;
+      return `<tr><td>${new Date(p.x).toLocaleDateString('zh-CN')}</td><td>${fmt4(p.y)}</td><td class="${chg>=0?'up':'dn'}">${chg>=0?'+':''}${chg.toFixed(2)}%</td></tr>`;
+    }).join('')}</tbody>
+  </table></div>`;
+  wrap.style.display = 'block';
+}
+
+// ============================================================
+// CANVAS CHART
+// ============================================================
+function drawChart(code, pts) {
+  const canvas = document.getElementById('chart-' + code);
+  if (!canvas || !pts || pts.length < 2) return;
+
+  const dpr = window.devicePixelRatio || 1;
+  const W = canvas.offsetWidth || 400;
+  const H = parseInt(canvas.getAttribute('height')) || 200;
+  canvas.width  = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width  = W + 'px';
+  canvas.style.height = H + 'px';
+
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  const pad = {top:10, right:10, bottom:20, left:40};
+  const cW = W - pad.left - pad.right;
+  const cH = H - pad.top  - pad.bottom;
+
+  const navs = pts.map(p => p.y);
+  const minV = Math.min(...navs);
+  const maxV = Math.max(...navs);
+  const range = maxV - minV || 0.001;
+
+  function xCoord(i) { return pad.left + (i / (pts.length - 1)) * cW; }
+  function yCoord(v) { return pad.top + (1 - (v - minV) / range) * cH; }
+
+  function calcMA(arr, len) {
+    return arr.map((_,i) => {
+      if (i < len - 1) return null;
+      return arr.slice(i - len + 1, i + 1).reduce((a,b) => a+b, 0) / len;
+    });
+  }
+
+  const ma5vals  = calcMA(navs, 5);
+  const ma20vals = calcMA(navs, 20);
+
+  // Determine color: up or down
+  const isUp = navs[navs.length-1] >= navs[0];
+  const lineColor = isUp ? '#e53935' : '#52c41a';
+
+  // Gradient fill
+  const grad = ctx.createLinearGradient(0, pad.top, 0, pad.top + cH);
+  grad.addColorStop(0, isUp ? 'rgba(229,57,53,.25)' : 'rgba(82,196,26,.25)');
+  grad.addColorStop(1, 'rgba(255,255,255,0)');
+
+  // Fill area
+  ctx.beginPath();
+  ctx.moveTo(xCoord(0), yCoord(navs[0]));
+  for (let i=1; i<pts.length; i++) ctx.lineTo(xCoord(i), yCoord(navs[i]));
+  ctx.lineTo(xCoord(pts.length-1), pad.top + cH);
+  ctx.lineTo(xCoord(0), pad.top + cH);
+  ctx.closePath();
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // NAV line
+  ctx.beginPath();
+  ctx.moveTo(xCoord(0), yCoord(navs[0]));
+  for (let i=1; i<pts.length; i++) ctx.lineTo(xCoord(i), yCoord(navs[i]));
+  ctx.strokeStyle = lineColor;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // MA5 dashed yellow
+  ctx.setLineDash([4,3]);
+  ctx.beginPath();
+  let started = false;
+  for (let i=0; i<pts.length; i++) {
+    if (ma5vals[i] === null) continue;
+    if (!started) { ctx.moveTo(xCoord(i), yCoord(ma5vals[i])); started=true; }
+    else ctx.lineTo(xCoord(i), yCoord(ma5vals[i]));
+  }
+  ctx.strokeStyle = '#faad14';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // MA20 dashed blue
+  ctx.beginPath();
+  started = false;
+  for (let i=0; i<pts.length; i++) {
+    if (ma20vals[i] === null) continue;
+    if (!started) { ctx.moveTo(xCoord(i), yCoord(ma20vals[i])); started=true; }
+    else ctx.lineTo(xCoord(i), yCoord(ma20vals[i]));
+  }
+  ctx.strokeStyle = '#1890ff';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Y axis labels
+  ctx.fillStyle = '#999';
+  ctx.font = `${10 * dpr / dpr}px sans-serif`;
+  ctx.textAlign = 'right';
+  ctx.fillText(fmt4(maxV), pad.left - 4, pad.top + 8);
+  ctx.fillText(fmt4(minV), pad.left - 4, pad.top + cH);
+
+  // End point dot
+  const lastX = xCoord(pts.length-1);
+  const lastY = yCoord(navs[navs.length-1]);
+  ctx.beginPath();
+  ctx.arc(lastX, lastY, 4, 0, Math.PI*2);
+  ctx.fillStyle = lineColor;
+  ctx.fill();
+}
+
+// ============================================================
+// SUMMARY BAR
+// ============================================================
+function updateSummary(computed) {
+  const codes = Object.keys(funds);
+  let buy=0, hold=0, sell=0, totalPnl=0, hasPnl=false;
+
+  codes.forEach(code => {
+    const c = computed && computed[code];
+    if (!c) return;
+    const sg = getSuggestion(c.score);
+    if (sg.label.includes('买') || sg.label.includes('加仓')) buy++;
+    else if (sg.label === '观望') hold++;
+    else sell++;
+
+    const f = funds[code];
+    if (f.amount > 0 && f.cost > 0) {
+      totalPnl += f.amount * (c.nav - f.cost) / f.cost;
+      hasPnl = true;
+    }
+  });
+
+  document.getElementById('sumTotal').textContent = codes.length;
+  document.getElementById('sumBuy').textContent   = buy;
+  document.getElementById('sumHold').textContent  = hold;
+  document.getElementById('sumSell').textContent  = sell;
+
+  const pnlEl = document.getElementById('sumPnl');
+  if (hasPnl) {
+    pnlEl.textContent = (totalPnl >= 0 ? '+' : '') + '¥' + fmt0(totalPnl);
+    pnlEl.className = 'summary-value summary-pnl ' + (totalPnl >= 0 ? 'pos' : 'neg');
+  } else {
+    pnlEl.textContent = '--';
+    pnlEl.className = 'summary-value summary-pnl';
+  }
+}
+
+// ============================================================
+// OCR
+// ============================================================
+async function handleOcr(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const apiKey = localStorage.getItem(LS_KEY) || '';
+  if (!apiKey) { showToast('请先设置DeepSeek API Key'); return; }
+
+  const resultEl = document.getElementById('ocrResult');
+  resultEl.textContent = '识别中...';
+
+  try {
+    const base64 = await fileToBase64(file);
+    const mimeType = file.type || 'image/jpeg';
+
+    const resp = await fetch('https://api.deepseek.com/chat/completions', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json','Authorization':'Bearer '+apiKey},
+      body: JSON.stringify({
+        model: DEEPSEEK_MODEL,
+        messages: [{
+          role: 'user',
+          content: [
+            {type:'image_url', image_url:{url:`data:${mimeType};base64,${base64}`}},
+            {type:'text', text:'请识别图片中的基金代码（6位数字）和持仓金额。以JSON格式返回：{"funds":[{"code":"XXXXXX","amount":数字}]}。如果无法识别，返回{"funds":[]}'}
+          ]
+        }]
+      })
+    });
+
+    if (!resp.ok) throw new Error('API响应: ' + resp.status);
+    const json = await resp.json();
+    const content = json.choices[0].message.content;
+
+    // Extract JSON
+    const match = content.match(/\{[\s\S]*\}/);
+    if (!match) throw new Error('无法解析返回');
+    const data = JSON.parse(match[0]);
+
+    if (!data.funds || !data.funds.length) {
+      resultEl.textContent = '未识别到基金代码';
+      return;
+    }
+
+    let added = 0;
+    data.funds.forEach(item => {
+      const code = String(item.code).padStart(6,'0');
+      if (!/^\d{6}$/.test(code)) return;
+      if (!funds[code]) {
+        funds[code] = {code, name:code, amount: item.amount||0, cost:0};
+        added++;
+      } else if (item.amount) {
+        funds[code].amount = item.amount;
+      }
+    });
+    saveFundsToLS();
+    renderCards();
+    updateSummary();
+    resultEl.textContent = `识别完成，新增 ${added} 只基金，共识别 ${data.funds.length} 条记录`;
+    showToast(`OCR识别完成`);
+  } catch(err) {
+    resultEl.textContent = '识别失败: ' + err.message + '，请手动输入基金代码';
+  }
+  e.target.value = '';
+}
+
+function fileToBase64(file) {
+  return new Promise((res, rej) => {
+    const reader = new FileReader();
+    reader.onload = e => res(e.target.result.split(',')[1]);
+    reader.onerror = rej;
+    reader.readAsDataURL(file);
+  });
+}
+
+// ============================================================
+// UTILS
+// ============================================================
+function fmt4(v) { return v != null ? parseFloat(v).toFixed(4) : '--'; }
+function fmt0(v) { return v != null ? Math.round(v).toLocaleString() : '--'; }
+function fmtPct(v) { return v != null ? (v>=0?'+':'')+v.toFixed(2)+'%' : '--'; }
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function showToast(msg, duration) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._tid);
+  t._tid = setTimeout(() => t.classList.remove('show'), duration || 2500);
+}
+
+// ============================================================
+// BOOT
+// ============================================================
+window.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
